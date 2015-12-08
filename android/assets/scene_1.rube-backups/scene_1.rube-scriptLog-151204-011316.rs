@@ -1,0 +1,22 @@
+//Restarted script log at Fri Dec  4 01:11:31 2015
+getImage(7).deselect();
+getImage(7).select();
+getImage(7).deselect();
+getImage(1).select();
+getImage(1).deselect();
+getImage(7).select();
+getImage(7).deselect();
+getImage(1).select();
+getImage(1).deselect();
+getImage(1).select();
+getImage(1).deselect();
+getImage(1).select();
+getImage(1).deselect();
+getImage(1).select();
+getImage(1).deselect();
+getImage(1).select();
+getImage(7).select();
+getImage(1).deselect();
+getImage(7).deselect();
+getImage(1).select();
+getImage(1).setFile('/Users/alfmagne1/libgdx-projects/rube-testing/android/assets/brown_dot.png');

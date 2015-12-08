@@ -1,0 +1,246 @@
+private var world:b2World=new b2World(new b2Vec2(0,10),true);
+		private var worldScale:int=30;
+		private var laserSegment:b2Segment;
+		private var drawing:Boolean=false;
+		private var affectedByLaser:Vector.<b2Body>;
+		private var entryPoint:Vector.<b2Vec2>;
+		private var explodingBodies:Vector.<b2Body>;
+		private var explosionCenterX:Number;
+		private var explosionCenterY:Number;
+		private var chunks:Number=5;
+		private var explosionRadius:Number=50;
+		public function Main() {
+			debugDraw();
+			addWall(320,480,640,20);
+			addWall(320,0,640,20);
+			addWall(0,240,20,480);
+			addWall(640,240,20,480);
+			addWall(320,240,200,200);
+			addWall(250,110,60,60);
+			addWall(390,110,60,60);
+			addEventListener(Event.ENTER_FRAME, updateWorld);
+			stage.addEventListener(MouseEvent.MOUSE_DOWN,mousePressed);
+		}
+		private function mousePressed(e:MouseEvent):void {
+			var cutAngle:Number;
+			explosionCenterX=mouseX;
+			explosionCenterY=mouseY;
+			var clickedBody:b2Body=GetBodyAtXY(new b2Vec2(explosionCenterX/worldScale,explosionCenterY/worldScale));
+			explodingBodies=new Vector.<b2Body>();
+			if (clickedBody!=null) {
+				explodingBodies.push(clickedBody);
+				for (var i:Number=0; i<chunks; i++) {
+					cutAngle=Math.random()*Math.PI*2;
+					laserSegment=new b2Segment();
+					laserSegment.p1=new b2Vec2((explosionCenterX+i/10-200*Math.cos(cutAngle))/worldScale,(explosionCenterY-200*Math.sin(cutAngle))/worldScale);
+					laserSegment.p2=new b2Vec2((explosionCenterX+200*Math.cos(cutAngle))/worldScale,(explosionCenterY+200*Math.sin(cutAngle))/worldScale);
+					affectedByLaser=new Vector.<b2Body>();
+					entryPoint=new Vector.<b2Vec2>();
+					world.RayCast(laserFired,laserSegment.p1,laserSegment.p2);
+					world.RayCast(laserFired,laserSegment.p2,laserSegment.p1);
+				}
+			}
+		}
+		private function debugDraw():void {
+			var debugDraw:b2DebugDraw = new b2DebugDraw();
+			var debugSprite:Sprite = new Sprite();
+			addChild(debugSprite);
+			debugDraw.SetSprite(debugSprite);
+			debugDraw.SetDrawScale(worldScale);
+			debugDraw.SetFlags(b2DebugDraw.e_shapeBit|b2DebugDraw.e_jointBit);
+			debugDraw.SetFillAlpha(0.5);
+			world.SetDebugDraw(debugDraw);
+		}
+		private function addWall(pX:Number,pY:Number,w:Number,h:Number):void {
+			var wallShape:b2PolygonShape = new b2PolygonShape();
+			wallShape.SetAsBox(w/worldScale/2,h/worldScale/2);
+			var wallFixture:b2FixtureDef = new b2FixtureDef();
+			wallFixture.density=0;
+			wallFixture.friction=1;
+			wallFixture.restitution=0.5;
+			wallFixture.shape=wallShape;
+			var wallBodyDef:b2BodyDef = new b2BodyDef();
+			wallBodyDef.position.Set(pX/worldScale,pY/worldScale);
+			var wall:b2Body=world.CreateBody(wallBodyDef);
+			wall.CreateFixture(wallFixture);
+		}
+		private function updateWorld(e:Event):void {
+			world.Step(1/30,10,10);
+			world.ClearForces();
+			world.DrawDebugData();
+		}
+		private function laserFired(fixture:b2Fixture,point:b2Vec2,normal:b2Vec2,fraction:Number):Number {
+			var affectedBody:b2Body=fixture.GetBody();
+			if (explodingBodies.indexOf(affectedBody)!=-1) {
+				var affectedPolygon:b2PolygonShape=fixture.GetShape() as b2PolygonShape;
+				var fixtureIndex:int=affectedByLaser.indexOf(affectedBody);
+				if (fixtureIndex==-1) {
+					affectedByLaser.push(affectedBody);
+					entryPoint.push(point);
+				}
+				else {
+					var rayCenter:b2Vec2=new b2Vec2((point.x+entryPoint[fixtureIndex].x)/2,(point.y+entryPoint[fixtureIndex].y)/2);
+					var rayAngle:Number=Math.atan2(entryPoint[fixtureIndex].y-point.y,entryPoint[fixtureIndex].x-point.x);
+					var polyVertices:Vector.<b2Vec2>=affectedPolygon.GetVertices();
+					var newPolyVertices1:Vector.<b2Vec2>=new Vector.<b2Vec2>();
+					var newPolyVertices2:Vector.<b2Vec2>=new Vector.<b2Vec2>();
+					var currentPoly:int=0;
+					var cutPlaced1:Boolean=false;
+					var cutPlaced2:Boolean=false;
+					for (var i:int=0; i<polyVertices.length; i++) {
+						var worldPoint:b2Vec2=affectedBody.GetWorldPoint(polyVertices[i]);
+						var cutAngle:Number=Math.atan2(worldPoint.y-rayCenter.y,worldPoint.x-rayCenter.x)-rayAngle;
+						if (cutAngle<Math.PI*-1) {
+							cutAngle+=2*Math.PI;
+						}
+						if (cutAngle>0&&cutAngle<=Math.PI) {
+							if (currentPoly==2) {
+								cutPlaced1=true;
+								newPolyVertices1.push(point);
+								newPolyVertices1.push(entryPoint[fixtureIndex]);
+							}
+							newPolyVertices1.push(worldPoint);
+							currentPoly=1;
+						}
+						else {
+							if (currentPoly==1) {
+								cutPlaced2=true;
+								newPolyVertices2.push(entryPoint[fixtureIndex]);
+								newPolyVertices2.push(point);
+							}
+							newPolyVertices2.push(worldPoint);
+							currentPoly=2;
+
+						}
+					}
+					if (! cutPlaced1) {
+						newPolyVertices1.push(point);
+						newPolyVertices1.push(entryPoint[fixtureIndex]);
+					}
+					if (! cutPlaced2) {
+						newPolyVertices2.push(entryPoint[fixtureIndex]);
+						newPolyVertices2.push(point);
+					}
+					createSlice(newPolyVertices1,newPolyVertices1.length);
+					createSlice(newPolyVertices2,newPolyVertices2.length);
+					world.DestroyBody(affectedBody);
+				}
+			}
+			return 1;
+		}
+		private function findCentroid(vs:Vector.<b2Vec2>, count:uint):b2Vec2 {
+			var c:b2Vec2 = new b2Vec2();
+			var area:Number=0.0;
+			var p1X:Number=0.0;
+			var p1Y:Number=0.0;
+			var inv3:Number=1.0/3.0;
+			for (var i:int = 0; i < count; ++i) {
+				var p2:b2Vec2=vs[i];
+				var p3:b2Vec2=i+1<count?vs[int(i+1)]:vs[0];
+				var e1X:Number=p2.x-p1X;
+				var e1Y:Number=p2.y-p1Y;
+				var e2X:Number=p3.x-p1X;
+				var e2Y:Number=p3.y-p1Y;
+				var D:Number = (e1X * e2Y - e1Y * e2X);
+				var triangleArea:Number=0.5*D;
+				area+=triangleArea;
+				c.x += triangleArea * inv3 * (p1X + p2.x + p3.x);
+				c.y += triangleArea * inv3 * (p1Y + p2.y + p3.y);
+			}
+			c.x*=1.0/area;
+			c.y*=1.0/area;
+			return c;
+		}
+		private function getArea(vs:Vector.<b2Vec2>, count:uint):Number {
+			var area:Number=0.0;
+			var p1X:Number=0.0;
+			var p1Y:Number=0.0;
+			var inv3:Number=1.0/3.0;
+			for (var i:int = 0; i < count; ++i) {
+				var p2:b2Vec2=vs[i];
+				var p3:b2Vec2=i+1<count?vs[int(i+1)]:vs[0];
+				var e1X:Number=p2.x-p1X;
+				var e1Y:Number=p2.y-p1Y;
+				var e2X:Number=p3.x-p1X;
+				var e2Y:Number=p3.y-p1Y;
+				var D:Number = (e1X * e2Y - e1Y * e2X);
+				var triangleArea:Number=0.5*D;
+				area+=triangleArea;
+			}
+			return area;
+		}
+		private function createSlice(vertices:Vector.<b2Vec2>,numVertices:int):void {
+			if (getArea(vertices,vertices.length)>=0.05) {
+				var centre:b2Vec2=findCentroid(vertices,vertices.length);
+				for (var i:int=0; i<numVertices; i++) {
+					vertices[i].Subtract(centre);
+				}
+				var sliceBody:b2BodyDef= new b2BodyDef();
+				sliceBody.position.Set(centre.x, centre.y);
+				sliceBody.type=b2Body.b2_dynamicBody;
+				var slicePoly:b2PolygonShape = new b2PolygonShape();
+				slicePoly.SetAsVector(vertices,numVertices);
+				var sliceFixture:b2FixtureDef = new b2FixtureDef();
+				sliceFixture.shape=slicePoly;
+				sliceFixture.density=1;
+				var worldSlice:b2Body=world.CreateBody(sliceBody);
+				worldSlice.CreateFixture(sliceFixture);
+				for (i=0; i<numVertices; i++) {
+					vertices[i].Add(centre);
+				}
+				var distX:Number=(centre.x*worldScale-explosionCenterX);
+				if (distX<0) {
+					if (distX<-explosionRadius) {
+						distX=0;
+					}
+					else {
+						distX=-50-distX;
+					}
+				}
+				else {
+					if (distX>explosionRadius) {
+						distX=0;
+					}
+					else {
+						distX=50-distX;
+					}
+				}
+				var distY:Number=(centre.y*worldScale-explosionCenterY);
+				if (distY<0) {
+					if (distY<-explosionRadius) {
+						distY=0;
+					}
+					else {
+						distY=-50-distY;
+					}
+				}
+				else {
+					if (distY>explosionRadius) {
+						distY=0;
+					}
+					else {
+						distY=50-distY;
+					}
+				}
+				distX*=0.25;
+				distY*=0.25;
+				worldSlice.SetLinearVelocity(new b2Vec2(distX,distY));
+				explodingBodies.push(worldSlice);
+			}
+		}
+		private function GetBodyAtXY(coordinate:b2Vec2):b2Body {
+			var touchedBody:b2Body=null;
+			world.QueryPoint(GetBodyCallback,coordinate);
+			function GetBodyCallback(fixture:b2Fixture):Boolean {
+				var shape:b2Shape=fixture.GetShape();
+				var inside:Boolean=shape.TestPoint(fixture.GetBody().GetTransform(),coordinate);
+				if (inside) {
+					touchedBody=fixture.GetBody();
+					return false;
+				}
+				return true;
+			}
+			return touchedBody;
+		}
+	}
+     */

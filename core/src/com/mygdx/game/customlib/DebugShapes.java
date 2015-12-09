@@ -73,7 +73,7 @@ public class DebugShapes {
         createCircle(world, atOrigin, 0.1f);
     }
 
-    public static void createCircle(World world, Vector2 atOrigin, float radius){
+    public static Body createCircle(World world, Vector2 atOrigin, float radius){
 
         BodyDef bodyDef = new BodyDef();
         bodyDef.type = BodyDef.BodyType.StaticBody;
@@ -85,6 +85,8 @@ public class DebugShapes {
 
         body.createFixture(shape, 1);
         body.setTransform(atOrigin, 0);
+
+        return body;
 
     }
 

@@ -1,15 +1,17 @@
 package com.mygdx.game.customlib.explodingbody;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.PolygonRegion;
 import com.badlogic.gdx.graphics.g2d.PolygonSprite;
 import com.badlogic.gdx.graphics.g2d.PolygonSpriteBatch;
+import com.badlogic.gdx.graphics.g2d.Sprite;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.EarClippingTriangulator;
 import com.badlogic.gdx.math.GeometryUtils;
 import com.badlogic.gdx.math.MathUtils;
-import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.BodyDef;
@@ -18,11 +20,15 @@ import com.badlogic.gdx.physics.box2d.PolygonShape;
 import com.badlogic.gdx.physics.box2d.RayCastCallback;
 import com.badlogic.gdx.physics.box2d.World;
 import com.badlogic.gdx.utils.Array;
-import com.badlogic.gdx.utils.ObjectMap;
+import com.gushikustudios.rube.loader.serializers.utils.RubeImage;
+import com.mygdx.game.SpriteGenerator;
 import com.mygdx.game.customlib.bodyproperties.BodyProperties;
+
+import net.dermetfan.gdx.physics.box2d.Box2DUtils;
 
 
 /**
+ * Exploding body
  * Created by alfmagne1 on 06/12/15.
  */
 public class ExplodingBody implements RayCastCallback {
@@ -36,23 +42,46 @@ public class ExplodingBody implements RayCastCallback {
 
     private World mWorld;
 
-    private boolean debugMode = false;
-
     private Vector2 explosionCenter;
     private float explosionRadius;
 
-    private ObjectMap<Body, PolygonSprite> mSprites;
-
+    private Array<Body> mSlices;
+    private Array<Body> mBodies;
 
     private Vector2 bodyMinOriginal;
 
-    private Rectangle boundingRectangle;
+    private EarClippingTriangulator mEarClippingTriangulator;
 
     public ExplodingBody() {
-        mSprites = new ObjectMap<>();
+        mSlices = new Array<>();
+        mBodies = new Array<>();
+        mEarClippingTriangulator = new EarClippingTriangulator();
+    }
+
+    public void add(RubeImage rubeImage, AssetManager assetManager){
+        Sprite sprite = SpriteGenerator.generateSprite(assetManager, rubeImage);
+        add(rubeImage.body, sprite);
+    }
+
+    public void add(Body body, Sprite sprite) {
+        Gdx.app.log("exploding", "Adding exploding");
+
+        BodyProperties properties;
+        if (body.getUserData() != null) {
+            properties = (BodyProperties) body.getUserData();
+        } else {
+            properties = new BodyProperties();
+        }
+
+        properties.sprite = sprite;
+        body.setUserData(properties);
+
+        mBodies.add(body);
     }
 
     public void explode(World world, Body body) {
+
+        Gdx.app.log("explode", "explode");
 
         mWorld = world;
         explosionCenter = body.getPosition();
@@ -61,10 +90,6 @@ public class ExplodingBody implements RayCastCallback {
         affectedBodies.add(body);
 
         bodyMinOriginal = getBodyMin(body);
-        if (body.getUserData() != null && body.getUserData() instanceof BodyProperties) {
-            Gdx.app.log("body", body.getUserData().toString());
-        }
-
 
         for (int i = 0; i < CHUNKS; i++) {
             float cutAngle = MathUtils.random() * MathUtils.PI2;
@@ -72,8 +97,6 @@ public class ExplodingBody implements RayCastCallback {
 
             Vector2 p1 = new Vector2((explosionCenter.x + (float) i / 1000 - offset * MathUtils.cos(cutAngle)) / worldScale, (explosionCenter.y - offset * MathUtils.sin(cutAngle)) / worldScale);
             Vector2 p2 = new Vector2((explosionCenter.x + (offset * MathUtils.cos(cutAngle))) / worldScale, (explosionCenter.y + (offset * MathUtils.sin(cutAngle))) / worldScale);
-
-            //DebugShapes.createLineSegment(mWorld, p1, p2);
 
             affectedByLaser = new Array<>();
             entryPoint = new Array<>();
@@ -89,8 +112,6 @@ public class ExplodingBody implements RayCastCallback {
         Body affectedBody = fixture.getBody();
 
         if (affectedBodies.contains(affectedBody, true) && fixture.getShape() instanceof PolygonShape) {
-
-            if (this.debugMode) Gdx.app.log("received", "received point " + point);
 
             PolygonShape affectedPolygon = (PolygonShape) fixture.getShape();
             int fixtureIndex = affectedByLaser.indexOf(affectedBody, true);
@@ -112,7 +133,6 @@ public class ExplodingBody implements RayCastCallback {
                 Array<Vector2> newPolyVertices1 = new Array<>();
                 Array<Vector2> newPolyVertices2 = new Array<>();
 
-                if (this.debugMode) Gdx.app.log("vertices", "Count: " + polyVertices.size);
                 int currentPoly = 0;
                 boolean cutPlaced1 = false;
                 boolean cutPlaced2 = false;
@@ -173,129 +193,146 @@ public class ExplodingBody implements RayCastCallback {
     }
 
     private void destroyBody(Body body) {
-        mSprites.remove(body);
+        int index = mSlices.indexOf(body, true);
+        if (index >= 0) {
+            mSlices.removeIndex(index);
+        }
+        index = mBodies.indexOf(body, true);
+        if(index >= 0){
+            mBodies.removeIndex(index);
+        }
         mWorld.destroyBody(body);
     }
 
-    private boolean logged = false;
+    private float debugAngle = 0;
 
     public void update(float delta) {
 
-        for (Body body : mSprites.keys()) {
+        debugAngle += 1;
+        debugAngle = debugAngle % 360f;
 
-            PolygonSprite sprite = mSprites.get(body);
 
-            sprite.setRotation(MathUtils.radiansToDegrees * body.getAngle());
-            sprite.setPosition(
-                    body.getPosition().x,
-                    body.getPosition().y
-            );
+        BodyProperties properties;
 
-            if (!logged) {
-                Gdx.app.log("body pos", "pos: " + body.getPosition().x + "x" + body.getPosition().y);
-                Gdx.app.log("sprite size", "size: " + sprite.getWidth() + "x" + sprite.getHeight() + ", " + sprite.getScaleX() + "x" + sprite.getScaleY());
-                logged = true;
+        for (Body body : mSlices) {
+
+            Object userData = body.getUserData();
+            if (userData != null) {
+                properties = (BodyProperties) userData;
+
+                if (properties.polygonSprite != null) {
+
+                    PolygonSprite sprite = properties.polygonSprite;
+
+                    Vector2 origin =new Vector2(properties.polygonSpriteOrigin);
+                    origin.rotate(body.getAngle() * MathUtils.radiansToDegrees);
+
+                    Vector2 position = new Vector2(body.getPosition());
+
+                    sprite.setPosition(
+                            position.x + origin.x - properties.polygonSpriteOrigin.x,
+                            position.y + origin.y - properties.polygonSpriteOrigin.y
+                    );
+                    sprite.setRotation(body.getAngle() * MathUtils.radiansToDegrees);
+                }
+            }
+        }
+
+        for(Body body : mBodies){
+            Object userData = body.getUserData();
+            if (userData != null) {
+                properties = (BodyProperties) userData;
+                if (properties.sprite != null) {
+                    properties.sprite.setPosition(
+                            body.getPosition().x - properties.sprite.getWidth() / 2f,
+                            body.getPosition().y - properties.sprite.getHeight() / 2f);
+                    properties.sprite.setRotation(MathUtils.radiansToDegrees * (body.getAngle()));
+                }
+            }
+        }
+    }
+
+    public void draw(SpriteBatch batch){
+
+        BodyProperties properties;
+
+        for (Body body : mBodies) {
+            if (body.getUserData() != null) {
+
+                properties = (BodyProperties) body.getUserData();
+
+                 if (properties.sprite != null) {
+                    properties.sprite.draw(batch);
+                }
             }
         }
     }
 
     public void draw(PolygonSpriteBatch spriteBatch) {
-        for (PolygonSprite sprite : mSprites.values()) {
-            sprite.draw(spriteBatch);
-        }
-    }
+        BodyProperties properties;
 
-    private Vector2 getBodyMin(Body body) {
-        Fixture fixture = body.getFixtureList().get(0);
-        PolygonShape shape = (PolygonShape) fixture.getShape();
-        Float minX = null;
-        Float minY = null;
-        Vector2 vector2 = new Vector2();
-        for (int i = 0, len = shape.getVertexCount(); i < len; i++) {
-            shape.getVertex(i, vector2);
-            if (minX == null) minX = vector2.x;
-            else minX = Math.min(minX, vector2.x);
-            if (minY == null) minY = vector2.y;
-            else minY = Math.min(minY, vector2.y);
-        }
-        Vector2 pos = body.getPosition();
-        return new Vector2(pos.x + minX, pos.y + minY);
-    }
-
-    private Vector2 getVertexMin(Vector2[] vertices) {
-        Vector2 min = null;
-
-        for (Vector2 vertex : vertices) {
-            if (min == null) min = new Vector2(vertex);
-            else {
-                min.x = Math.min(min.x, vertex.x);
-                min.y = Math.min(min.y, vertex.y);
+        for (Body body : mSlices) {
+            if (body.getUserData() != null) {
+                properties = (BodyProperties) body.getUserData();
+                if (properties.polygonSprite != null) {
+                    properties.polygonSprite.draw(spriteBatch);
+                }
             }
         }
 
-        return min;
-
     }
 
-    private void addSprite(Vector2[] vertexPairs, Body newBody, Body originalBody, Vector2 centre) {
+
+    private void addSprite(Vector2[] vertexPairs, Body newBody, Body originalBody) {
 
 
         Object userData = originalBody.getUserData();
         if (userData == null || !(userData instanceof BodyProperties)) return;
 
         BodyProperties properties = (BodyProperties) originalBody.getUserData();
-        if (properties.mSprite != null) {
-            Texture texture = properties.mSprite.getTexture();
+        if (properties.sprite != null) {
+            Texture texture = properties.sprite.getTexture();
 
             float[] vertices = new float[vertexPairs.length * 2];
-            float[] plainVertices = new float[vertexPairs.length * 2];
-            float scaleX = properties.mSprite.getScaleX();
-            float scaleY = properties.mSprite.getScaleY();
-            int index = 0;
+
+            float scaleX = properties.sprite.getScaleX();
+            float scaleY = properties.sprite.getScaleY();
 
             Vector2 bodyPos = getBodyMin(newBody).sub(bodyMinOriginal).sub(getVertexMin(vertexPairs));
-            //Vector2 minOffset = getVertexMin(vertexPairs);
-
-            //DebugShapes.createCross(mWorld, getBodyMin(newBody), 1.5f);
-
-            // DebugShapes.createCross(mWorld, getVertexMin(vertexPairs), 2f);
 
             for (int i = 0; i < vertexPairs.length; i++) {
-
                 vertices[i * 2] = (bodyPos.x + vertexPairs[i].x) / scaleX;
                 vertices[i * 2 + 1] = (bodyPos.y + vertexPairs[i].y) / scaleY;
-
-                Gdx.app.log("pos", "pos: " + vertices[i * 2] + "x" + vertices[i * 2 + 1]);
             }
 
-            TextureRegion[] regions = TextureRegion.split(texture, (int) properties.mSprite.getWidth(), (int) properties.mSprite.getHeight())[0];
-            TextureRegion region = regions[0];
+            TextureRegion region = new TextureRegion(texture, (int) properties.sprite.getWidth(), (int) properties.sprite.getHeight());
 
-            short triangles[] = new EarClippingTriangulator()
+            short triangles[] = mEarClippingTriangulator
                     .computeTriangles(vertices)
                     .toArray();
 
             PolygonRegion polygonRegion = new PolygonRegion(region, vertices, triangles);
+
             PolygonSprite sprite = new PolygonSprite(polygonRegion);
 
-            Vector2 origin = new Vector2(centre).sub(bodyPos);
+            Vector2 origin = new Vector2();
+            origin.x = -bodyPos.x;
+            origin.y = -bodyPos.y;
 
-            sprite.setOrigin(-(bodyPos.x),-(bodyPos.y));
+            sprite.setOrigin(-(bodyPos.x), -(bodyPos.y));
+
             sprite.setScale(scaleX, scaleY);
-            mSprites.put(newBody, sprite);
+            mSlices.add(newBody);
 
             BodyProperties newProperties = new BodyProperties();
             newProperties.polygonSprite = sprite;
-            newProperties.mSprite = properties.mSprite;
+            newProperties.sprite = properties.sprite;
+            newProperties.polygonSpriteOrigin = origin;
             newBody.setUserData(newProperties);
-
-            Gdx.app.log("sprite", "scale: " + sprite.getScaleX() + "x" + sprite.getScaleY());
         }
     }
 
-    public void dispose() {
 
-    }
 
     private void createSlice(Vector2[] vertices, Body fromBody) {
 
@@ -303,10 +340,8 @@ public class ExplodingBody implements RayCastCallback {
 
             Vector2 centre = findCentroid(vertices);
 
-            // DebugShapes.createCircle(mWorld, centre);
-
             BodyDef sliceBodyDef = new BodyDef();
-            sliceBodyDef.type = BodyDef.BodyType.StaticBody;
+            sliceBodyDef.type = BodyDef.BodyType.DynamicBody;
             Body sliceBody = mWorld.createBody(sliceBodyDef);
 
             PolygonShape slicePoly = new PolygonShape();
@@ -319,7 +354,7 @@ public class ExplodingBody implements RayCastCallback {
             sliceBody.createFixture(slicePoly, 1);
             sliceBody.setTransform(centre, 0);
 
-            addSprite(vertices, sliceBody, fromBody, centre);
+            addSprite(vertices, sliceBody, fromBody);
 
 
             float distX = centre.x - explosionCenter.x;
@@ -356,24 +391,39 @@ public class ExplodingBody implements RayCastCallback {
             sliceBody.setLinearVelocity(new Vector2(distX, distY));
             affectedBodies.add(sliceBody);
 
-        } else {
-            Gdx.app.log("vertices", "Not creating, Area : ");
+            slicePoly.dispose();
+
         }
     }
 
 
-    private void positionVerticesAndBody(Body body, Vector2[] vertices) {
+    private Vector2 getBodyMin(Body body) {
+        float[] vertices = Box2DUtils.vertices(body.getFixtureList().get(0));
+        Vector2 pos = new Vector2(
+                net.dermetfan.gdx.math.GeometryUtils.minX(vertices),
+                net.dermetfan.gdx.math.GeometryUtils.minY(vertices)
+        );
+        Vector2 bodyPos = body.getPosition();
+        return new Vector2(bodyPos.x + pos.x, bodyPos.y + pos.y);
+    }
 
-        Vector2 centre = findCentroid(vertices);
+    private Vector2 getVertexMin(Vector2[] vertices) {
+        Vector2 min = null;
         for (Vector2 vertex : vertices) {
-            vertex.sub(centre);
+            if (min == null) min = new Vector2(vertex);
+            else {
+                min.x = Math.min(min.x, vertex.x);
+                min.y = Math.min(min.y, vertex.y);
+            }
         }
-        body.setTransform(centre, 0);
+        return min;
     }
 
+    public void dispose() {
+
+    }
 
     private float getArea(Vector2[] vs) {
-
         if (vs.length < 3) return 0;
         float[] vertices = new float[vs.length * 2];
         int index = 0;

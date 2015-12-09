@@ -7,14 +7,10 @@ import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.g2d.PolygonRegion;
 import com.badlogic.gdx.graphics.g2d.PolygonSprite;
 import com.badlogic.gdx.graphics.g2d.PolygonSpriteBatch;
 import com.badlogic.gdx.graphics.g2d.Sprite;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.badlogic.gdx.math.EarClippingTriangulator;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
@@ -28,7 +24,6 @@ import com.badlogic.gdx.physics.box2d.ContactListener;
 import com.badlogic.gdx.physics.box2d.Fixture;
 import com.badlogic.gdx.physics.box2d.Joint;
 import com.badlogic.gdx.physics.box2d.Manifold;
-import com.badlogic.gdx.physics.box2d.PolygonShape;
 import com.badlogic.gdx.physics.box2d.World;
 import com.badlogic.gdx.physics.box2d.joints.RevoluteJoint;
 import com.badlogic.gdx.utils.Array;
@@ -43,7 +38,6 @@ import com.mygdx.game.customlib.elevator.ElevatorHandler;
 import com.mygdx.game.customlib.explodingbody.ExplodingBody;
 import com.mygdx.game.customlib.wobbly.WobblyHandler;
 
-import box2dLight.PointLight;
 import box2dLight.RayHandler;
 
 /**
@@ -112,20 +106,20 @@ public class GameScreen extends ScreenAdapter {
         viewport.apply(true);
 
         mCurrentState = STATE_SETUP;
+        mExplodingBody = new ExplodingBody();
 
         debugRenderer = new Box2DDebugRenderer();
 
         mScene = mGame.getAssetManager().get(mMap, RubeScene.class);
         box2dCam = new OrthographicCamera(UNIT_WIDTH * cameraScale, UNIT_HEIGHT * cameraScale);
         mSpriteBatch = new SpriteBatch();
-
+        polyBatch = new PolygonSpriteBatch();
         mStaticSprites = new Array<>();
         mWorld = mScene.getWorld();
 
         mWorld.setContactListener(new BombContactListener());
 
         processScene();
-
 
         Gdx.input.setInputProcessor(new InputAdapter() {
 
@@ -167,8 +161,8 @@ public class GameScreen extends ScreenAdapter {
 
     private Body mSensorBody;
 
-    private void moveSensor(int screenX, int screenY){
-        if(mSensorBody != null){
+    private void moveSensor(int screenX, int screenY) {
+        if (mSensorBody != null) {
             mWorld.destroyBody(mSensorBody);
             mSensorBody = null;
         }
@@ -186,25 +180,6 @@ public class GameScreen extends ScreenAdapter {
         Vector3 pos = new Vector3(screenX, screenY, 0);
         box2dCam.unproject(pos);
         mSensorBody.setTransform(pos.x, pos.y, 0);
-    }
-
-    private void applyLight() {
-        RayHandler.setGammaCorrection(true);
-        RayHandler.useDiffuseLight(false);
-
-        mRayHandler = new RayHandler(mWorld);
-        mRayHandler.setAmbientLight(0.5f, 0.5f, 0.5f, 0.3f);
-        mRayHandler.setBlurNum(3);
-
-
-        PointLight light = new PointLight(
-                mRayHandler, 20, Color.WHITE, 1f, 0f, 0f);
-        light.attachToBody(mBall, 1f, 1f);
-        light.setColor(
-                1f,
-                1f,
-                1f,
-                1f);
     }
 
     @Override
@@ -240,7 +215,7 @@ public class GameScreen extends ScreenAdapter {
     private void processScene() {
         Array<Body> bodies = mScene.getBodies();
 
-        if(bodies != null) {
+        if (bodies != null) {
             for (Body body : bodies) {
                 if (mScene.getCustom(body, "actor", false) == Boolean.TRUE) {
                     mBall = body;
@@ -248,8 +223,8 @@ public class GameScreen extends ScreenAdapter {
                 mBombHandler.processBomb(mScene, body);
                 mWobblyHandler.processBody(mScene, body);
 
-                if(mMap.equals("level_3.json") && mScene.getCustom(body, "exploding", false) == Boolean.TRUE){
-                    debugTextureRegion(body);
+                if (mMap.equals("level_3.json") && mScene.getCustom(body, "exploding", false) == Boolean.TRUE) {
+                    //debugTextureRegion(body);
                 }
 
             }
@@ -263,7 +238,7 @@ public class GameScreen extends ScreenAdapter {
                 if (mScene.getCustom(joint, "breakableJoint", false) == Boolean.TRUE) {
                     mBreakableJoint.add(joint);
                 }
-                if(joint instanceof RevoluteJoint && mScene.getCustom(joint, "wheeldrive", false) == Boolean.TRUE){
+                if (joint instanceof RevoluteJoint && mScene.getCustom(joint, "wheeldrive", false) == Boolean.TRUE) {
                     mWheelDrives.add((RevoluteJoint) joint);
                 }
                 mElevatorHandler.processJoints(mScene, joint);
@@ -280,11 +255,17 @@ public class GameScreen extends ScreenAdapter {
                 Sprite sprite = SpriteGenerator.generateSprite(mGame.getAssetManager(), image);
                 if (sprite != null) {
                     if (image.body != null) {
-                        mBodySprites.put(image, sprite);
 
-                        BodyProperties properties = new BodyProperties();
-                        properties.mSprite = sprite;
-                        image.body.setUserData(properties);
+                        if(mScene.getCustom(image.body, "exploding", false) == Boolean.TRUE){
+                            mExplodingBody.add(image, mGame.getAssetManager());
+                            // mExpBody = image.body;
+                        }else {
+                            mBodySprites.put(image, sprite);
+
+                            BodyProperties properties = new BodyProperties();
+                            properties.sprite = sprite;
+                            image.body.setUserData(properties);
+                        }
 
                     } else {
                         mStaticSprites.add(sprite);
@@ -311,8 +292,11 @@ public class GameScreen extends ScreenAdapter {
     PolygonSprite poly;
     Body mExpBody;
 
+    /*
     private static final float PIXELS_PER_METER = 10;
-    private void debugTextureRegion(Body body){
+
+
+    private void debugTextureRegion(Body body) {
         mExpBody = body;
         Texture texture = mGame.getAssetManager().get("texture_200x200.png", Texture.class);
         TextureRegion[] regions = TextureRegion.split(texture, 200, 200)[0];
@@ -330,7 +314,7 @@ public class GameScreen extends ScreenAdapter {
             plainVertices[k * 2] = mTmp.x;
             plainVertices[k * 2 + 1] = mTmp.y;
 
-            mTmp.rotate(body.getAngle()* MathUtils.radiansToDegrees);
+            mTmp.rotate(body.getAngle() * MathUtils.radiansToDegrees);
             mTmp.add(body.getPosition());
             vertices[k * 2] = mTmp.x * PIXELS_PER_METER;
             vertices[k * 2 + 1] = mTmp.y * PIXELS_PER_METER;
@@ -343,6 +327,7 @@ public class GameScreen extends ScreenAdapter {
         poly = new PolygonSprite(region);
         polyBatch = new PolygonSpriteBatch();
     }
+    */
 
     private ExplodingBody mExplodingBody;
     private boolean mBodyExploded;
@@ -371,16 +356,16 @@ public class GameScreen extends ScreenAdapter {
         mElevatorHandler.update(delta);
         mBombHandler.update(delta, mWorld, mGame.getAssetManager());
 
-        if(wheelPowerUpdate != 0){
-            for(RevoluteJoint wheel : mWheelDrives){
+        if (wheelPowerUpdate != 0) {
+            for (RevoluteJoint wheel : mWheelDrives) {
                 wheel.setMotorSpeed(wheel.getMotorSpeed() + wheelPowerUpdate);
             }
             wheelPowerUpdate = 0;
         }
 
-        if(!mBodyExploded && mExpBody != null){
+        if (!mBodyExploded && mExpBody != null) {
             mBodyExploded = true;
-            mExplodingBody = new ExplodingBody();
+
             mExplodingBody.explode(mWorld, mExpBody);
         }
 
@@ -416,26 +401,20 @@ public class GameScreen extends ScreenAdapter {
         }
 
         for (Sprite sprite : mBodySprites.values()) {
-           // sprite.draw(mSpriteBatch);
+            sprite.draw(mSpriteBatch);
         }
-        mBombHandler.draw(mSpriteBatch);
 
+        mBombHandler.draw(mSpriteBatch);
+        mExplodingBody.draw(mSpriteBatch);
         mSpriteBatch.end();
 
+        polyBatch.setProjectionMatrix(box2dCam.projection);
+        polyBatch.setTransformMatrix(box2dCam.view);
+        polyBatch.begin();
 
-        if(poly != null){
-            polyBatch.setProjectionMatrix(box2dCam.projection);
-            polyBatch.setTransformMatrix(box2dCam.view);
+        mExplodingBody.draw(polyBatch);
 
-
-            polyBatch.begin();
-
-           // poly.draw(polyBatch);
-
-            mExplodingBody.draw(polyBatch);
-
-            polyBatch.end();
-        }
+        polyBatch.end();
 
         /*
         mRayHandler.setCombinedMatrix(box2dCam);
@@ -466,7 +445,6 @@ public class GameScreen extends ScreenAdapter {
     private class BombContactListener implements ContactListener {
 
 
-
         @Override
         public void beginContact(Contact contact) {
             if (contact.isTouching()) {
@@ -476,14 +454,14 @@ public class GameScreen extends ScreenAdapter {
                 boolean attackerIsSensor = attacker.isSensor();
                 boolean defenderIsSensor = defender.isSensor();
 
-                if(attackerIsSensor){
+                if (attackerIsSensor) {
                     Body body = defender.getBody();
-                    if(body.getUserData() != null && body.getUserData().equals("isbomb")){
+                    if (body.getUserData() != null && body.getUserData().equals("isbomb")) {
                         mBombHandler.explode(body);
                     }
-                }else if(defenderIsSensor){
+                } else if (defenderIsSensor) {
                     Body body = attacker.getBody();
-                    if(body.getUserData() != null && body.getUserData().equals("isbomb")){
+                    if (body.getUserData() != null && body.getUserData().equals("isbomb")) {
                         mBombHandler.explode(body);
                     }
 

@@ -106,7 +106,6 @@ public class GameScreen extends ScreenAdapter {
         viewport.apply(true);
 
         mCurrentState = STATE_SETUP;
-        mExplodingBody = new ExplodingBody();
 
         debugRenderer = new Box2DDebugRenderer();
 
@@ -116,6 +115,7 @@ public class GameScreen extends ScreenAdapter {
         polyBatch = new PolygonSpriteBatch();
         mStaticSprites = new Array<>();
         mWorld = mScene.getWorld();
+        mExplodingBody = new ExplodingBody(mWorld);
 
         mWorld.setContactListener(new BombContactListener());
 
@@ -258,7 +258,7 @@ public class GameScreen extends ScreenAdapter {
 
                         if(mScene.getCustom(image.body, "exploding", false) == Boolean.TRUE){
                             mExplodingBody.add(image, mGame.getAssetManager());
-                            // mExpBody = image.body;
+                            mExpBody = image.body;
                         }else {
                             mBodySprites.put(image, sprite);
 
@@ -363,20 +363,14 @@ public class GameScreen extends ScreenAdapter {
             wheelPowerUpdate = 0;
         }
 
-        if (!mBodyExploded && mExpBody != null) {
-            mBodyExploded = true;
-
-            mExplodingBody.explode(mWorld, mExpBody);
-        }
-
         mExplodingBody.update(delta);
 
+        if(mExpBody != null){
+            Gdx.app.log("explode", "explode");
+            mExplodingBody.explode(mExpBody);
+            mExpBody = null;
+        }
 
-        /*
-        box2dCam.position.set(UNIT_WIDTH / 2, UNIT_HEIGHT / 2, 0);
-        box2dCam.update();
-        updateSpritePositions();
-        */
     }
 
     private void updateSpritePositions() {
@@ -459,11 +453,15 @@ public class GameScreen extends ScreenAdapter {
                     if (body.getUserData() != null && body.getUserData().equals("isbomb")) {
                         mBombHandler.explode(body);
                     }
+                    if(mExplodingBody.canExplode(body))mExpBody = body;
                 } else if (defenderIsSensor) {
                     Body body = attacker.getBody();
                     if (body.getUserData() != null && body.getUserData().equals("isbomb")) {
                         mBombHandler.explode(body);
                     }
+
+                    if(mExplodingBody.canExplode(body))mExpBody = body;
+
 
                 }
             }

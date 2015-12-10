@@ -7,12 +7,7 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.g2d.PolygonRegion;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
-import com.badlogic.gdx.math.EarClippingTriangulator;
-import com.badlogic.gdx.math.MathUtils;
-import com.badlogic.gdx.physics.box2d.Body;
-import com.badlogic.gdx.physics.box2d.PolygonShape;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
@@ -64,9 +59,11 @@ public class LoadingScreen extends ScreenAdapter {
         viewport = new FitViewport(WORLD_WIDTH, WORLD_HEIGHT, camera);
         shapeRenderer = new ShapeRenderer();
 
+        mGame.getAssetManager().load("grid.png", Texture.class);
         mGame.getAssetManager().load("bomb_particle.png", Texture.class);
         mGame.getAssetManager().load(mMap, RubeScene.class);
         mGame.getAssetManager().load("texture_200x200.png", Texture.class);
+        mGame.getAssetManager().load("texture_300x300.png", Texture.class);
 
 
     }
@@ -112,6 +109,7 @@ public class LoadingScreen extends ScreenAdapter {
             } else {
                 Gdx.app.log("loading", "Loading game screen");
                 mGame.setScreen(new GameScreen(mGame, mMap));
+                // mGame.setScreen(new TextureTestScreen(mGame, mMap));
             }
         } else {
             progress = mGame.getAssetManager().getProgress();

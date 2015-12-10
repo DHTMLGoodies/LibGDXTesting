@@ -17,6 +17,7 @@ import com.badlogic.gdx.physics.box2d.World;
 import com.badlogic.gdx.utils.Array;
 import com.gushikustudios.rube.loader.serializers.utils.RubeImage;
 import com.mygdx.game.SpriteGenerator;
+import com.mygdx.game.customlib.Box2DDebug;
 import com.mygdx.game.customlib.bodyproperties.BodyProperties;
 import com.mygdx.game.customlib.bodyproperties.sprites.BodySpriteRenderer;
 import com.mygdx.game.customlib.bodyproperties.sprites.PolygonSpriteRenderer;
@@ -117,24 +118,7 @@ public class BreakableBody implements RayCastCallback {
         }
     }
 
-    private void explodeUsingFixtures(Body body){
 
-        Array<Fixture> fixtures = body.getFixtureList();
-
-        for(Fixture fixture : fixtures){
-            PolygonShape shape = (PolygonShape)fixture.getShape();
-            int countVertices = shape.getVertexCount();
-            Vector2[] vertices = new Vector2[countVertices];
-            Vector2 currentVertex = new Vector2();
-            for(int i = 0;i<countVertices;i++){
-                shape.getVertex(i, currentVertex);
-                vertices[i] = new Vector2(body.getWorldPoint(currentVertex));
-            }
-            createSlice(vertices, body);
-        }
-
-        destroyBody(body);
-    }
 
     @Override
     public float reportRayFixture(Fixture fixture, Vector2 point, Vector2 normal, float fraction) {
@@ -229,8 +213,8 @@ public class BreakableBody implements RayCastCallback {
             vertices2[i] = newPolyVertices2.get(i);
         }
 
-        createSlice(vertices1, affectedBody);
-        createSlice(vertices2, affectedBody);
+        createSlice(vertices1, affectedBody, null);
+        createSlice(vertices2, affectedBody, null);
         destroyBody(affectedBody);
 
     }
@@ -259,41 +243,109 @@ public class BreakableBody implements RayCastCallback {
         mPolygonSpriteRenderer.draw(spriteBatch);
     }
 
-    private void createSlice(Vector2[] vertices, Body fromBody) {
+    private void explodeUsingFixtures(Body body){
+
+        float angle = body.getAngle();
+        BodyProperties properties = (BodyProperties) body.getUserData();
+        properties.angleOnExplosion = angle;
+
+        Vector2 centre = null;
+
+        if(body.getAngle() != 0){
+            Array<Fixture> fixtures = body.getFixtureList();
+            for(Fixture fixture : fixtures){
+                PolygonShape shape = (PolygonShape)fixture.getShape();
+                int countVertices = shape.getVertexCount();
+                Vector2[] vertices = new Vector2[countVertices];
+                Vector2 currentVertex = new Vector2();
+                for(int i = 0;i<countVertices;i++){
+                    shape.getVertex(i, currentVertex);
+                    vertices[i] = new Vector2(body.getWorldPoint(currentVertex));
+                }
+
+                centre = findCentroid(vertices);
+            }
+        }
+
+        body.setTransform(body.getPosition(), 0);
+
+        Box2DDebug.createCircle(mWorld, centre);
+
+        Array<Fixture> fixtures = body.getFixtureList();
+        for(Fixture fixture : fixtures){
+            PolygonShape shape = (PolygonShape)fixture.getShape();
+            int countVertices = shape.getVertexCount();
+            Vector2[] vertices = new Vector2[countVertices];
+            Vector2 currentVertex = new Vector2();
+            for(int i = 0;i<countVertices;i++){
+                shape.getVertex(i, currentVertex);
+                vertices[i] = new Vector2(currentVertex);
+            }
+
+            createSlice(vertices, body, body.getWorldPoint(currentVertex));
+
+        }
+
+        destroyBody(body);
+    }
+
+    private void createSlice(PolygonShape shape,  Body fromBody, Vector2[] textureVertices){
+
+        BodyDef sliceBodyDef = new BodyDef();
+        sliceBodyDef.type = BodyDef.BodyType.StaticBody;
+        Body sliceBody = mWorld.createBody(sliceBodyDef);
+        sliceBody.createFixture(shape, 1);
+
+
+        shape.dispose();
+
+    }
+
+
+    private void createSlice(Vector2[] vertices, Body fromBody, Vector2 centre) {
 
         if (getArea(vertices) > 0.01f) {
 
-            float[] floatVertices = Geometry.toFloats(vertices);
-            float minX = net.dermetfan.utils.math.GeometryUtils.minX(floatVertices);
-            float minY = net.dermetfan.utils.math.GeometryUtils.minY(floatVertices);
-
-
             BodyProperties properties = (BodyProperties) fromBody.getUserData();
 
-            Vector2 centre = findCentroid(vertices);
+            float[] floatVertices = Geometry.toFloats(vertices);
+            Vector2 min = new Vector2(
+                    net.dermetfan.gdx.math.GeometryUtils.minX(floatVertices),
+                    net.dermetfan.gdx.math.GeometryUtils.minY(floatVertices)
+                );
+
+            Vector2 centerVertices = findCentroid(vertices);
+
+            if(centre == null) centre = centerVertices;
 
             BodyDef sliceBodyDef = new BodyDef();
-            sliceBodyDef.type = BodyDef.BodyType.DynamicBody;
+            sliceBodyDef.type = BodyDef.BodyType.StaticBody;
             Body sliceBody = mWorld.createBody(sliceBodyDef);
 
             PolygonShape slicePoly = new PolygonShape();
+
+
 
             Vector2[] textureVertices = new Vector2[vertices.length];
 
             int index = 0;
             for (Vector2 vertex : vertices) {
                 textureVertices[index++] = new Vector2(vertex.x, vertex.y);
-                vertex.sub(centre);
+                vertex.sub(centerVertices);
             }
+
+            Box2DDebug.logVertices(vertices, "vertices");
 
             slicePoly.set(vertices);
             sliceBody.createFixture(slicePoly, 1);
 
-            if (properties.angleOnExplosion != 0) {
+            if(properties.angleOnExplosion != 0){
                 sliceBody.setTransform(centre, properties.angleOnExplosion);
-            } else {
+
+            }else{
                 sliceBody.setTransform(centre, properties.angleOnExplosion);
             }
+
 
             mPolygonSpriteRenderer.add(textureVertices, sliceBody, fromBody);
 

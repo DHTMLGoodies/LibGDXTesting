@@ -1,5 +1,6 @@
 package com.mygdx.game.customlib;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.BodyDef;
@@ -7,11 +8,12 @@ import com.badlogic.gdx.physics.box2d.CircleShape;
 import com.badlogic.gdx.physics.box2d.EdgeShape;
 import com.badlogic.gdx.physics.box2d.PolygonShape;
 import com.badlogic.gdx.physics.box2d.World;
+import com.mygdx.game.customlib.util.Geometry;
 
 /**
  * Created by alfmagne1 on 07/12/15.
  */
-public class DebugShapes {
+public class Box2DDebug {
 
 
     public static void createPolygon(World world, PolygonShape shape, Vector2 atPosition) {
@@ -81,13 +83,32 @@ public class DebugShapes {
 
         CircleShape shape = new CircleShape();
         shape.setRadius(radius);
-        shape.setPosition(new Vector2(radius/2, radius/2));
+        shape.setPosition(new Vector2(radius / 2, radius / 2));
 
         body.createFixture(shape, 1);
         body.setTransform(atOrigin, 0);
 
         return body;
 
+    }
+
+
+    public static void logVertices(Vector2[] vertices, String tag){
+        logVertices(Geometry.toFloats(vertices), tag);
+    }
+
+    public static void logVertices(float[] vertices, String tag){
+        for(int i=0;i<vertices.length; i+=2){
+            Gdx.app.log(tag, tag + " " + vertices[i] + "x" + vertices[i+1]);
+        }
+    }
+
+    public static void log(float value){
+        Gdx.app.log("float", "float: " + value);
+    }
+
+    public static void log(Vector2 vector2,  String tag){
+        Gdx.app.log(tag, tag + ": " + vector2);
     }
 
 

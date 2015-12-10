@@ -10,7 +10,6 @@ import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.utils.Array;
 import com.gushikustudios.rube.loader.serializers.utils.RubeImage;
 import com.mygdx.game.customlib.bodyproperties.BodyProperties;
-import com.mygdx.game.customlib.util.Geometry;
 
 import net.dermetfan.gdx.physics.box2d.Box2DUtils;
 
@@ -54,15 +53,10 @@ public class BodySpriteRenderer {
         );
 
         float regionWidth = region.getRegionWidth();
-        float regionHeight = region.getRegionHeight();
 
         properties.regionScale = regionWidth / properties.bodySize.x;
         properties.textureRegion = region;
         body.setUserData(properties);
-
-        Geometry.log(properties.bodySize, "body");
-
-        Geometry.log(new Vector2(regionWidth, regionHeight), "regionsize");
 
         mBodies.add(body);
     }

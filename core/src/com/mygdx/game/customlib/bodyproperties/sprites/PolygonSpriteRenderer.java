@@ -55,8 +55,6 @@ public class PolygonSpriteRenderer {
 
         vertices = GeometryUtils.sub(vertices, minX, minY);
 
-        Geometry.logVertices(vertices, "texture");
-
         vertices = GeometryUtils.mul(vertices, parentProperties.regionScale, parentProperties.regionScale);
 
         Vector2 textureMin = new Vector2(GeometryUtils.minX(vertices), GeometryUtils.minY(vertices));
@@ -125,8 +123,6 @@ public class PolygonSpriteRenderer {
             Vector2 bodyPos = body.getPosition();
             Vector2 bodySize = properties.bodySize;
 
-            float size = Math.max(bodySize.x, bodySize.y);
-
             float x = bodyPos.x + bodyOrigin.x;
             float y = bodyPos.y + bodyOrigin.y;
 
@@ -138,11 +134,9 @@ public class PolygonSpriteRenderer {
             float scaleY = 1f;
             float rotation = body.getAngle() * MathUtils.radiansToDegrees;
 
-
             batch.draw(
                     region, x, y, originX, originY, width, height, scaleX, scaleY, rotation);
 
-            // Gdx.app.log("draw", "draw at " + x + "x" + y + " with size " + width + "x" + height + " and origin " + originX + "x" + originY);
         }
 
 

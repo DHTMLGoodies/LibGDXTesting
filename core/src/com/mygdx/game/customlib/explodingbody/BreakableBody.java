@@ -2,11 +2,9 @@ package com.mygdx.game.customlib.explodingbody;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.assets.AssetManager;
-import com.badlogic.gdx.graphics.g2d.PolygonSprite;
 import com.badlogic.gdx.graphics.g2d.PolygonSpriteBatch;
 import com.badlogic.gdx.graphics.g2d.Sprite;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.math.EarClippingTriangulator;
 import com.badlogic.gdx.math.GeometryUtils;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
@@ -22,15 +20,16 @@ import com.mygdx.game.SpriteGenerator;
 import com.mygdx.game.customlib.bodyproperties.BodyProperties;
 import com.mygdx.game.customlib.bodyproperties.sprites.BodySpriteRenderer;
 import com.mygdx.game.customlib.bodyproperties.sprites.PolygonSpriteRenderer;
+import com.mygdx.game.customlib.util.Geometry;
 
 
 /**
  * Exploding body
  * Created by alfmagne1 on 06/12/15.
  */
-public class ExplodingBody implements RayCastCallback {
+public class BreakableBody implements RayCastCallback {
 
-    private static final int CHUNKS = 3;
+    private static final int CHUNKS = 2;
 
     private Array<Body> affectedBodies = new Array<>();
 
@@ -42,22 +41,15 @@ public class ExplodingBody implements RayCastCallback {
     private Vector2 explosionCenter;
     private float explosionRadius;
 
-    private Array<Body> mSlices;
     private Array<Body> mBodies;
-
-    private Vector2 bodyMinOriginal;
-
-    private EarClippingTriangulator mEarClippingTriangulator;
 
     private BodySpriteRenderer mBodySpriteRenderer;
     private PolygonSpriteRenderer mPolygonSpriteRenderer;
 
 
-    public ExplodingBody(World world) {
+    public BreakableBody(World world) {
         mWorld = world;
-        mSlices = new Array<>();
         mBodies = new Array<>();
-        mEarClippingTriangulator = new EarClippingTriangulator();
         mBodySpriteRenderer = new BodySpriteRenderer();
         mPolygonSpriteRenderer = new PolygonSpriteRenderer();
     }
@@ -90,14 +82,25 @@ public class ExplodingBody implements RayCastCallback {
 
         Gdx.app.log("fixtures", "fixtures: " + body.getFixtureList().size);
 
-        if (body.getFixtureList().size == 0) return;
+        int fixtures = body.getFixtureList().size;
+
+        if(fixtures == 0)return;
 
         explosionCenter = body.getPosition();
         explosionRadius = 5;
-        float worldScale = 1;
+
         affectedBodies.add(body);
 
+        if(fixtures == 1){
+            explodeUsingRaycast(body);
+        }else{
+            explodeUsingFixtures(body);
+        }
 
+    }
+
+    private void explodeUsingRaycast(Body body){
+        float worldScale = 1;
 
         for (int i = 0; i < CHUNKS; i++) {
             float cutAngle = MathUtils.random() * MathUtils.PI2;
@@ -112,6 +115,25 @@ public class ExplodingBody implements RayCastCallback {
             mWorld.rayCast(this, p1, p2);
             mWorld.rayCast(this, p2, p1);
         }
+    }
+
+    private void explodeUsingFixtures(Body body){
+
+        Array<Fixture> fixtures = body.getFixtureList();
+
+        for(Fixture fixture : fixtures){
+            PolygonShape shape = (PolygonShape)fixture.getShape();
+            int countVertices = shape.getVertexCount();
+            Vector2[] vertices = new Vector2[countVertices];
+            Vector2 currentVertex = new Vector2();
+            for(int i = 0;i<countVertices;i++){
+                shape.getVertex(i, currentVertex);
+                vertices[i] = new Vector2(body.getWorldPoint(currentVertex));
+            }
+            createSlice(vertices, body);
+        }
+
+        destroyBody(body);
     }
 
     @Override
@@ -133,10 +155,7 @@ public class ExplodingBody implements RayCastCallback {
                 affectedByLaser.add(affectedBody);
                 entryPoint.add(new Vector2(point.x, point.y));
             } else {
-
                 Vector2 entry = entryPoint.get(fixtureIndex);
-                // entry.x = 13f; entry.y = 7f;
-                // point.x = 16f; point.y = 8f;
                 splitBody(affectedBody, affectedPolygon, entry, point);
             }
         }
@@ -221,51 +240,15 @@ public class ExplodingBody implements RayCastCallback {
         mBodySpriteRenderer.destroy(body);
         mPolygonSpriteRenderer.destroyBody(body);
 
-        int index = mSlices.indexOf(body, true);
-        if (index >= 0) {
-            mSlices.removeIndex(index);
-        }
-        index = mBodies.indexOf(body, true);
+        int index = mBodies.indexOf(body, true);
         if (index >= 0) {
             mBodies.removeIndex(index);
         }
         mWorld.destroyBody(body);
-
-
     }
-
-    private float debugAngle = 0;
 
     public void update(float delta) {
 
-        debugAngle += 1;
-        debugAngle = debugAngle % 360f;
-
-        BodyProperties properties;
-
-        for (Body body : mSlices) {
-
-            Object userData = body.getUserData();
-            if (userData != null) {
-                properties = (BodyProperties) userData;
-
-                if (properties.polygonSprite != null) {
-
-                    PolygonSprite sprite = properties.polygonSprite;
-
-                    Vector2 origin = new Vector2(properties.polygonSpriteOrigin);
-                    origin.rotate(body.getAngle() * MathUtils.radiansToDegrees);
-
-                    Vector2 position = new Vector2(body.getPosition());
-
-                    sprite.setPosition(
-                            position.x + origin.x - properties.polygonSpriteOrigin.x,
-                            position.y + origin.y - properties.polygonSpriteOrigin.y
-                    );
-                    sprite.setRotation(body.getAngle() * MathUtils.radiansToDegrees);
-                }
-            }
-        }
     }
 
     public void draw(SpriteBatch batch) {
@@ -274,34 +257,16 @@ public class ExplodingBody implements RayCastCallback {
 
     public void draw(PolygonSpriteBatch spriteBatch) {
         mPolygonSpriteRenderer.draw(spriteBatch);
-        /*
-        BodyProperties properties;
-
-        for (Body body : mSlices) {
-            if (body.getUserData() != null) {
-                properties = (BodyProperties) body.getUserData();
-                if (properties.polygonSprite != null) {
-                    properties.polygonSprite.draw(spriteBatch);
-                }
-            }
-        }
-        */
-    }
-
-
-    private float[] vectorToArrayToFloats(Vector2[] vertices) {
-        float[] floats = new float[vertices.length * 2];
-        int index = 0;
-        for (Vector2 vertex : vertices) {
-            floats[index++] = vertex.x;
-            floats[index++] = vertex.y;
-        }
-        return floats;
     }
 
     private void createSlice(Vector2[] vertices, Body fromBody) {
 
-        if (getArea(vertices) > 0.05f) {
+        if (getArea(vertices) > 0.01f) {
+
+            float[] floatVertices = Geometry.toFloats(vertices);
+            float minX = net.dermetfan.utils.math.GeometryUtils.minX(floatVertices);
+            float minY = net.dermetfan.utils.math.GeometryUtils.minY(floatVertices);
+
 
             BodyProperties properties = (BodyProperties) fromBody.getUserData();
 
@@ -332,50 +297,8 @@ public class ExplodingBody implements RayCastCallback {
 
             mPolygonSpriteRenderer.add(textureVertices, sliceBody, fromBody);
 
-            BodyProperties tmp = BodyProperties.get(sliceBody);
-            if(tmp == null){
-                Gdx.app.log("body properties", "PROPS IS NULL===================");
-            }
-
-            float distX = centre.x - explosionCenter.x;
-
-            if (distX < 0) {
-                if (distX < -explosionRadius) {
-                    distX = 0;
-                } else {
-                    distX = -explosionRadius - distX;
-                }
-            } else {
-                if (distX > explosionRadius) {
-                    distX = 0;
-                } else {
-                    distX = 50 - distX;
-                }
-            }
-            float distY = centre.y - explosionCenter.y;
-            if (distY < 0) {
-                if (distY < -explosionRadius) {
-                    distY = 0;
-                } else {
-                    distY = -explosionRadius - distY;
-                }
-            } else {
-                if (distY > explosionRadius) {
-                    distY = 0;
-                } else {
-                    distY = explosionRadius - distY;
-                }
-            }
-            distX *= 0.25;
-            distY *= 0.25;
-            //sliceBody.setLinearVelocity(new Vector2(distX, distY));
-
             addAffectedBody(sliceBody, fromBody);
             slicePoly.dispose();
-
-
-
-
         }
     }
 
@@ -389,14 +312,9 @@ public class ExplodingBody implements RayCastCallback {
     }
 
     private float getArea(Vector2[] vs) {
-        if (vs.length < 3) return 0;
-        float[] vertices = new float[vs.length * 2];
-        int index = 0;
-        for (Vector2 v : vs) {
-            vertices[index++] = v.x;
-            vertices[index++] = v.y;
-        }
 
+        if (vs.length < 3) return 0;
+        float[] vertices = Geometry.toFloats(vs);
         return GeometryUtils.polygonArea(vertices, 0, vertices.length);
 
     }

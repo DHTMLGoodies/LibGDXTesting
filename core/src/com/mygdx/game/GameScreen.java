@@ -32,10 +32,10 @@ import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.gushikustudios.rube.RubeScene;
 import com.gushikustudios.rube.loader.serializers.utils.RubeImage;
-import com.mygdx.game.customlib.bodyproperties.BodyProperties;
+import com.mygdx.game.customlib.bodyproperties.sprites.BodySpriteRenderer;
 import com.mygdx.game.customlib.bomb.BombHandler;
 import com.mygdx.game.customlib.elevator.ElevatorHandler;
-import com.mygdx.game.customlib.explodingbody.ExplodingBody;
+import com.mygdx.game.customlib.explodingbody.BreakableBody;
 import com.mygdx.game.customlib.wobbly.WobblyHandler;
 
 import box2dLight.RayHandler;
@@ -91,9 +91,12 @@ public class GameScreen extends ScreenAdapter {
     private Array<Body> mBombs = new Array<>();
     private BombHandler mBombHandler = new BombHandler();
 
+    private BodySpriteRenderer mBodySpriteRenderer;
+
     public GameScreen(RubeTestingGame game, String map) {
         mGame = game;
         mMap = map;
+        mBodySpriteRenderer = new BodySpriteRenderer();
     }
 
     @Override
@@ -115,7 +118,7 @@ public class GameScreen extends ScreenAdapter {
         polyBatch = new PolygonSpriteBatch();
         mStaticSprites = new Array<>();
         mWorld = mScene.getWorld();
-        mExplodingBody = new ExplodingBody(mWorld);
+        mExplodingBody = new BreakableBody(mWorld);
 
         mWorld.setContactListener(new BombContactListener());
 
@@ -260,11 +263,9 @@ public class GameScreen extends ScreenAdapter {
                             mExplodingBody.add(image, mGame.getAssetManager());
                             mExpBody = image.body;
                         }else {
-                            mBodySprites.put(image, sprite);
 
-                            BodyProperties properties = new BodyProperties();
-                            properties.sprite = sprite;
-                            image.body.setUserData(properties);
+                            mBodySpriteRenderer.add(image, mGame.getAssetManager());
+
                         }
 
                     } else {
@@ -329,7 +330,7 @@ public class GameScreen extends ScreenAdapter {
     }
     */
 
-    private ExplodingBody mExplodingBody;
+    private BreakableBody mExplodingBody;
     private boolean mBodyExploded;
 
     private void update(float delta) {
@@ -400,6 +401,8 @@ public class GameScreen extends ScreenAdapter {
 
         mBombHandler.draw(mSpriteBatch);
         mExplodingBody.draw(mSpriteBatch);
+        mBodySpriteRenderer.draw(mSpriteBatch);
+
         mSpriteBatch.end();
 
         polyBatch.setProjectionMatrix(box2dCam.projection);
@@ -409,6 +412,8 @@ public class GameScreen extends ScreenAdapter {
         mExplodingBody.draw(polyBatch);
 
         polyBatch.end();
+
+
 
         /*
         mRayHandler.setCombinedMatrix(box2dCam);

@@ -1,13 +1,10 @@
 package com.mygdx.game.customlib.bodyproperties;
 
 import com.badlogic.gdx.graphics.g2d.PolygonRegion;
-import com.badlogic.gdx.graphics.g2d.PolygonSprite;
 import com.badlogic.gdx.graphics.g2d.Sprite;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Body;
-
-import net.dermetfan.gdx.graphics.g2d.Box2DSprite;
 
 /**
  * Created by alfmagne1 on 07/12/15.
@@ -15,10 +12,7 @@ import net.dermetfan.gdx.graphics.g2d.Box2DSprite;
 public class BodyProperties {
 
     public Sprite sprite;
-    public PolygonSprite polygonSprite;
     public String userString;
-    public Vector2 polygonSpriteOrigin;
-    public Box2DSprite box2DSprite;
 
     public TextureRegion textureRegion;
 
@@ -27,7 +21,6 @@ public class BodyProperties {
 
     public PolygonRegion polygonRegion;
     public float regionScale;
-
     public float angleOnExplosion;
 
     public String toString(){

@@ -1,6 +1,5 @@
 package com.mygdx.game.customlib.bodyproperties.sprites;
 
-import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.g2d.PolygonRegion;
 import com.badlogic.gdx.graphics.g2d.PolygonSpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -31,6 +30,7 @@ public class PolygonSpriteRenderer {
 
     public void add(Vector2[] textureVertices, Body body, Body parentBody) {
 
+
         float[] vertices = Geometry.toFloats(textureVertices);
 
         BodyProperties parentProperties = BodyProperties.get(parentBody);
@@ -45,7 +45,6 @@ public class PolygonSpriteRenderer {
 
         if (region == null) {
             body.setUserData(properties);
-            Gdx.app.log("texture", "TEXTURE REGION IS NULL");
             return;
         }
 
@@ -55,6 +54,9 @@ public class PolygonSpriteRenderer {
         float minY = parentBody.getPosition().y + Box2DUtils.minY(parentBody);
 
         vertices = GeometryUtils.sub(vertices, minX, minY);
+
+        Geometry.logVertices(vertices, "texture");
+
         vertices = GeometryUtils.mul(vertices, parentProperties.regionScale, parentProperties.regionScale);
 
         Vector2 textureMin = new Vector2(GeometryUtils.minX(vertices), GeometryUtils.minY(vertices));
@@ -79,13 +81,10 @@ public class PolygonSpriteRenderer {
         properties.polygonRegion = new PolygonRegion(region, vertices, triangles);
         properties.textureRegion = region;
 
-        // Gdx.app.log("region size", "region size: " + region.getRegionWidth() + "x" + region.getRegionHeight() + "," + parentProperties.regionScale);
         body.setUserData(properties);
 
         mBodies.add(body);
-
     }
-
 
     private void applyProperties(Body body, BodyProperties properties) {
 
@@ -97,7 +96,6 @@ public class PolygonSpriteRenderer {
                 Box2DUtils.maxX(body) - properties.bodyOrigin.x,
                 Box2DUtils.maxY(body) - properties.bodyOrigin.y
         );
-        Gdx.app.log("size", "size is " + properties.bodySize);
     }
 
     public void draw(PolygonSpriteBatch batch) {

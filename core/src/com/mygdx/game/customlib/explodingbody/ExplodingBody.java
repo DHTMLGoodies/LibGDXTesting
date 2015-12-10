@@ -97,10 +97,7 @@ public class ExplodingBody implements RayCastCallback {
         float worldScale = 1;
         affectedBodies.add(body);
 
-        float angle = body.getAngle();
-        BodyProperties properties = (BodyProperties) body.getUserData();
-        properties.angleOnExplosion = angle;
-        body.setTransform(body.getPosition(), 0);
+
 
         for (int i = 0; i < CHUNKS; i++) {
             float cutAngle = MathUtils.random() * MathUtils.PI2;
@@ -123,6 +120,11 @@ public class ExplodingBody implements RayCastCallback {
         Body affectedBody = fixture.getBody();
 
         if (affectedBodies.contains(affectedBody, true) && fixture.getShape() instanceof PolygonShape) {
+
+            float angle = affectedBody.getAngle();
+            BodyProperties properties = (BodyProperties) affectedBody.getUserData();
+            properties.angleOnExplosion = angle;
+            affectedBody.setTransform(affectedBody.getPosition(), 0);
 
             PolygonShape affectedPolygon = (PolygonShape) fixture.getShape();
             int fixtureIndex = affectedByLaser.indexOf(affectedBody, true);
@@ -217,6 +219,7 @@ public class ExplodingBody implements RayCastCallback {
     private void destroyBody(Body body) {
 
         mBodySpriteRenderer.destroy(body);
+        mPolygonSpriteRenderer.destroyBody(body);
 
         int index = mSlices.indexOf(body, true);
         if (index >= 0) {
@@ -329,6 +332,11 @@ public class ExplodingBody implements RayCastCallback {
 
             mPolygonSpriteRenderer.add(textureVertices, sliceBody, fromBody);
 
+            BodyProperties tmp = BodyProperties.get(sliceBody);
+            if(tmp == null){
+                Gdx.app.log("body properties", "PROPS IS NULL===================");
+            }
+
             float distX = centre.x - explosionCenter.x;
 
             if (distX < 0) {
@@ -364,6 +372,8 @@ public class ExplodingBody implements RayCastCallback {
 
             addAffectedBody(sliceBody, fromBody);
             slicePoly.dispose();
+
+
 
 
         }

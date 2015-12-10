@@ -44,6 +44,8 @@ public class PolygonSpriteRenderer {
         TextureRegion region = parentProperties.textureRegion;
 
         if (region == null) {
+            body.setUserData(properties);
+            Gdx.app.log("texture", "TEXTURE REGION IS NULL");
             return;
         }
 
@@ -75,6 +77,7 @@ public class PolygonSpriteRenderer {
 
         properties.regionScale = parentProperties.regionScale;
         properties.polygonRegion = new PolygonRegion(region, vertices, triangles);
+        properties.textureRegion = region;
 
         // Gdx.app.log("region size", "region size: " + region.getRegionWidth() + "x" + region.getRegionHeight() + "," + parentProperties.regionScale);
         body.setUserData(properties);
@@ -153,60 +156,4 @@ public class PolygonSpriteRenderer {
             mBodies.removeIndex(index);
         }
     }
-
-    /*
-           Object userData = originalBody.getUserData();
-        if (userData == null || !(userData instanceof BodyProperties)) return;
-
-        BodyProperties properties = (BodyProperties) originalBody.getUserData();
-        if (properties.sprite != null) {
-
-            float angle = originalBody.getAngle();
-
-            Texture texture = properties.sprite.getTexture();
-
-            float[] vertices = new float[textureVertices.length * 2];
-            float[] plainVertices = new float[textureVertices.length * 2];
-
-            float scaleX = properties.sprite.getScaleX();
-            float scaleY = properties.sprite.getScaleY();
-
-            Vector2 bodyPos = getBodyMin(newBody).sub(bodyMinOriginal).sub(getVertexMin(textureVertices));
-
-            for (int i = 0; i < textureVertices.length; i++) {
-                textureVertices[i].x = (bodyPos.x + textureVertices[i].x) / scaleX;
-                textureVertices[i].y = (bodyPos.y + textureVertices[i].y) / scaleY;
-
-                vertices[i*2] = textureVertices[i].x;
-                vertices[i*2+1] = textureVertices[i].y;
-                plainVertices[i*2] = textureVertices[i].x;
-                plainVertices[i*2+1] = textureVertices[i].y;
-            }
-
-            TextureRegion region = new TextureRegion(texture, (int) properties.sprite.getWidth(), (int) properties.sprite.getHeight());
-
-            short triangles[] = mEarClippingTriangulator
-                    .computeTriangles(vertices)
-                    .toArray();
-
-            PolygonRegion polygonRegion = new PolygonRegion(region, vertices, triangles);
-
-            PolygonSprite sprite = new PolygonSprite(polygonRegion);
-
-            Vector2 origin = new Vector2();
-            origin.x = -bodyPos.x;
-            origin.y = -bodyPos.y;
-
-            sprite.setOrigin(-(bodyPos.x), -(bodyPos.y));
-
-            sprite.setScale(scaleX, scaleY);
-            mSlices.add(newBody);
-
-            BodyProperties newProperties = new BodyProperties();
-            newProperties.polygonSprite = sprite;
-            newProperties.sprite = properties.sprite;
-            newProperties.polygonSpriteOrigin = origin;
-            newBody.setUserData(newProperties);
-        }
-     */
 }

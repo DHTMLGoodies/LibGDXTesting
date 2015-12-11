@@ -17,11 +17,12 @@ import com.badlogic.gdx.physics.box2d.World;
 import com.badlogic.gdx.utils.Array;
 import com.gushikustudios.rube.loader.serializers.utils.RubeImage;
 import com.mygdx.game.SpriteGenerator;
-import com.mygdx.game.customlib.Box2DDebug;
 import com.mygdx.game.customlib.bodyproperties.BodyProperties;
 import com.mygdx.game.customlib.bodyproperties.sprites.BodySpriteRenderer;
 import com.mygdx.game.customlib.bodyproperties.sprites.PolygonSpriteRenderer;
 import com.mygdx.game.customlib.util.Geometry;
+
+import net.dermetfan.gdx.physics.box2d.Box2DUtils;
 
 
 /**
@@ -249,8 +250,10 @@ public class BreakableBody implements RayCastCallback {
         properties.angleOnExplosion = angle;
 
         Array<Vector2> centers = null;
+
         Array<Fixture> fixtures = body.getFixtureList();
         if (body.getAngle() != 0) {
+
 
             for (Fixture fixture : fixtures) {
 
@@ -260,7 +263,6 @@ public class BreakableBody implements RayCastCallback {
                 Vector2 currentVertex = new Vector2();
                 for (int i = 0; i < countVertices; i++) {
                     shape.getVertex(i, currentVertex);
-
                     vertices[i] = new Vector2(body.getWorldPoint(currentVertex));
                 }
 
@@ -318,6 +320,9 @@ public class BreakableBody implements RayCastCallback {
 
 
             BodyDef sliceBodyDef = new BodyDef();
+
+
+
             sliceBodyDef.type = BodyDef.BodyType.StaticBody;
             Body sliceBody = mWorld.createBody(sliceBodyDef);
 
@@ -328,7 +333,7 @@ public class BreakableBody implements RayCastCallback {
             int index = 0;
             for (Vector2 vertex : vertices) {
                 textureVertices[index++] = new Vector2(vertex.x, vertex.y);
-                vertex.sub(centerVertices); // this is correct for non-rotated bodies
+                vertex.sub(centerVertices); // centerVertices is correct for non-rotated bodies
             }
 
             slicePoly.set(vertices);
@@ -337,7 +342,22 @@ public class BreakableBody implements RayCastCallback {
 
             if (properties.angleOnExplosion != 0) {
 
-                sliceBody.setTransform(centerVertices, properties.angleOnExplosion);
+                sliceBody.setTransform(centre, properties.angleOnExplosion);
+
+                float[] newVertices = Box2DUtils.vertices(sliceBody.getFixtureList().get(0));
+                Vector2 point = new Vector2();
+                for(int i=0;i<newVertices.length; i+=2){
+                    point.x = newVertices[i];
+                    point.y = newVertices[i+1];
+                    point = sliceBody.getWorldPoint(point);
+                    newVertices[i] = point.x;
+                    newVertices[i+1] = point.y;
+                }
+                Vector2 centreNew = new Vector2();
+                GeometryUtils.polygonCentroid(newVertices, 0, newVertices.length, centreNew);
+                Vector2 diff = new Vector2(centre.x - centreNew.x, centre.y - centreNew.y);
+
+                sliceBody.setTransform(centre.add(diff), properties.angleOnExplosion);
             } else {
                 sliceBody.setTransform(centerVertices, 0);
             }
@@ -371,15 +391,11 @@ public class BreakableBody implements RayCastCallback {
         if (vs.length < 3) {
             return new Vector2(0, 0);
         }
-        float[] vertices = new float[vs.length * 2];
-        int index = 0;
-
-        for (Vector2 v : vs) {
-            vertices[index++] = v.x;
-            vertices[index++] = v.y;
-        }
+        float[] vertices = Geometry.toFloats(vs);
         Vector2 centre = new Vector2();
         GeometryUtils.polygonCentroid(vertices, 0, vertices.length, centre);
         return centre;
     }
+
+
 }

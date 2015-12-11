@@ -3,6 +3,7 @@ package com.mygdx.game;
 import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Sprite;
+import com.badlogic.gdx.math.MathUtils;
 import com.gushikustudios.rube.loader.serializers.utils.RubeImage;
 
 
@@ -12,7 +13,7 @@ public class SpriteGenerator {
 
     public static Sprite generateSprite(AssetManager assetManager, RubeImage image) {
         Sprite sprite = new Sprite(assetManager.get(image.file, Texture.class));
-        sprite.setOrigin(sprite.getWidth() / 2 + image.center.x, sprite.getHeight() / 2 + image.center.y);
+        sprite.setOrigin(sprite.getWidth() / 2, sprite.getHeight() / 2);
 
         float multiplier = USING_BOX2D_CAMERA ? 1 : Constants.UNITS_PER_METER;
 
@@ -41,6 +42,10 @@ public class SpriteGenerator {
             float width = image.width * multiplier;
             float height = image.height * multiplier;
             sprite.setBounds(x, y, width, height);
+            if(image.angleInRads != 0){
+                sprite.setOrigin(sprite.getWidth() / 2, sprite.getHeight() / 2);
+                sprite.setRotation(image.angleInRads * MathUtils.radiansToDegrees);
+            }
             //Gdx.app.log("sprite", "New pos: " + x + " x "+ y + " size: " + width + " x " + height);
         }
         /*

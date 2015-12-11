@@ -85,22 +85,22 @@ public class BreakableBody implements RayCastCallback {
 
         int fixtures = body.getFixtureList().size;
 
-        if(fixtures == 0)return;
+        if (fixtures == 0) return;
 
         explosionCenter = body.getPosition();
         explosionRadius = 5;
 
         affectedBodies.add(body);
 
-        if(fixtures == 1){
+        if (fixtures == 1) {
             explodeUsingRaycast(body);
-        }else{
+        } else {
             explodeUsingFixtures(body);
         }
 
     }
 
-    private void explodeUsingRaycast(Body body){
+    private void explodeUsingRaycast(Body body) {
         float worldScale = 1;
 
         for (int i = 0; i < CHUNKS; i++) {
@@ -117,7 +117,6 @@ public class BreakableBody implements RayCastCallback {
             mWorld.rayCast(this, p2, p1);
         }
     }
-
 
 
     @Override
@@ -213,8 +212,8 @@ public class BreakableBody implements RayCastCallback {
             vertices2[i] = newPolyVertices2.get(i);
         }
 
-        createSlice(vertices1, affectedBody, null, null);
-        createSlice(vertices2, affectedBody, null, null);
+        createSlice(vertices1, affectedBody, null);
+        createSlice(vertices2, affectedBody, null);
         destroyBody(affectedBody);
 
     }
@@ -243,64 +242,61 @@ public class BreakableBody implements RayCastCallback {
         mPolygonSpriteRenderer.draw(spriteBatch);
     }
 
-    private void explodeUsingFixtures(Body body){
+    private void explodeUsingFixtures(Body body) {
 
         float angle = body.getAngle();
         BodyProperties properties = (BodyProperties) body.getUserData();
         properties.angleOnExplosion = angle;
 
-        Vector2 centre = null;
-
-        Vector2 minParent = null;
-
+        Array<Vector2> centers = null;
         Array<Fixture> fixtures = body.getFixtureList();
+        if (body.getAngle() != 0) {
 
-        if(body.getAngle() != 0){
+            for (Fixture fixture : fixtures) {
 
-            for(Fixture fixture : fixtures){
-
-                PolygonShape shape = (PolygonShape)fixture.getShape();
+                PolygonShape shape = (PolygonShape) fixture.getShape();
                 int countVertices = shape.getVertexCount();
                 Vector2[] vertices = new Vector2[countVertices];
                 Vector2 currentVertex = new Vector2();
-                for(int i = 0;i<countVertices;i++){
+                for (int i = 0; i < countVertices; i++) {
                     shape.getVertex(i, currentVertex);
+
                     vertices[i] = new Vector2(body.getWorldPoint(currentVertex));
-
-                    if(minParent == null)minParent = new Vector2(vertices[i]);else {
-                        minParent.x = Math.min(minParent.x, vertices[i].x);
-                        minParent.y = Math.min(minParent.y, vertices[i].y);
-                    }
-
                 }
 
-                centre = findCentroid(vertices);
+                if (centers == null) {
+                    centers = new Array<>();
+                }
+                centers.add(findCentroid(vertices));
+
+
             }
         }
 
         body.setTransform(body.getPosition(), 0);
 
-        for(Fixture fixture : fixtures){
-            PolygonShape shape = (PolygonShape)fixture.getShape();
+        int index = 0;
+        for (Fixture fixture : fixtures) {
+            PolygonShape shape = (PolygonShape) fixture.getShape();
 
             int countVertices = shape.getVertexCount();
             Vector2[] vertices = new Vector2[countVertices];
             Vector2 currentVertex = new Vector2();
-            for(int i = 0;i<countVertices;i++){
+            for (int i = 0; i < countVertices; i++) {
                 shape.getVertex(i, currentVertex);
                 vertices[i] = new Vector2(body.getWorldPoint(currentVertex));
             }
 
-            createSlice(vertices, body, centre, minParent);
+            createSlice(vertices, body, centers != null ? centers.get(index) : null);
 
+            index++;
         }
 
         destroyBody(body);
     }
 
 
-
-    private void createSlice(Vector2[] vertices, Body fromBody, Vector2 centre, Vector2 minParent) {
+    private void createSlice(Vector2[] vertices, Body fromBody, Vector2 centre) {
 
         if (getArea(vertices) > 0.01f) {
 
@@ -310,19 +306,16 @@ public class BreakableBody implements RayCastCallback {
             Vector2 min = new Vector2(
                     net.dermetfan.gdx.math.GeometryUtils.minX(floatVertices),
                     net.dermetfan.gdx.math.GeometryUtils.minY(floatVertices)
-                );
+            );
             Vector2 max = new Vector2(
                     net.dermetfan.gdx.math.GeometryUtils.maxX(floatVertices),
                     net.dermetfan.gdx.math.GeometryUtils.maxY(floatVertices)
-                );
-
-            Vector2 diff = new Vector2(1.5f, 1.5f);
+            );
 
 
             Vector2 centerVertices = new Vector2(min.x + (max.x - min.x) / 2,
                     min.y + (max.y - min.y) / 2);
 
-            if(centre == null) centre = centerVertices;
 
             BodyDef sliceBodyDef = new BodyDef();
             sliceBodyDef.type = BodyDef.BodyType.StaticBody;
@@ -335,23 +328,22 @@ public class BreakableBody implements RayCastCallback {
             int index = 0;
             for (Vector2 vertex : vertices) {
                 textureVertices[index++] = new Vector2(vertex.x, vertex.y);
-                vertex.sub(min);
+                vertex.sub(centerVertices); // this is correct for non-rotated bodies
             }
 
             slicePoly.set(vertices);
             sliceBody.createFixture(slicePoly, 1);
 
-            Box2DDebug.createCross(mWorld, centre, 2f);
 
-            if(properties.angleOnExplosion != 0){
-                sliceBody.setTransform(centre, properties.angleOnExplosion);
+            if (properties.angleOnExplosion != 0) {
 
-            }else{
-                sliceBody.setTransform(centre, properties.angleOnExplosion);
+                sliceBody.setTransform(centerVertices, properties.angleOnExplosion);
+            } else {
+                sliceBody.setTransform(centerVertices, 0);
             }
 
-
             mPolygonSpriteRenderer.add(textureVertices, sliceBody, fromBody);
+
 
             addAffectedBody(sliceBody, fromBody);
             slicePoly.dispose();

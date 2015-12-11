@@ -36,7 +36,11 @@ public class Box2DDebug {
 
         body.createFixture(shape, 1);
         body.setTransform(atPosition, 0);
+
+        shape.dispose();
     }
+
+
 
     public static void createCross(World world, Vector2 atOrigin, float size){
 
@@ -57,6 +61,8 @@ public class Box2DDebug {
         edgeShape.set(from, to);
         body.createFixture(edgeShape, 1);
 
+        edgeShape.dispose();
+
 
     }
 
@@ -68,6 +74,12 @@ public class Box2DDebug {
         EdgeShape edgeShape = new EdgeShape();
         edgeShape.set(from, to);
         body.createFixture(edgeShape, 1);
+    }
+
+    public static void createCircle(World world, Vector2[] points){
+        for(Vector2 point : points){
+            createCircle(world, point, 0.4f);
+        }
     }
 
 

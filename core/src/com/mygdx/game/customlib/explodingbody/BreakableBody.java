@@ -213,8 +213,8 @@ public class BreakableBody implements RayCastCallback {
             vertices2[i] = newPolyVertices2.get(i);
         }
 
-        createSlice(vertices1, affectedBody, null);
-        createSlice(vertices2, affectedBody, null);
+        createSlice(vertices1, affectedBody, null, null);
+        createSlice(vertices2, affectedBody, null, null);
         destroyBody(affectedBody);
 
     }
@@ -251,9 +251,14 @@ public class BreakableBody implements RayCastCallback {
 
         Vector2 centre = null;
 
+        Vector2 minParent = null;
+
+        Array<Fixture> fixtures = body.getFixtureList();
+
         if(body.getAngle() != 0){
-            Array<Fixture> fixtures = body.getFixtureList();
+
             for(Fixture fixture : fixtures){
+
                 PolygonShape shape = (PolygonShape)fixture.getShape();
                 int countVertices = shape.getVertexCount();
                 Vector2[] vertices = new Vector2[countVertices];
@@ -261,6 +266,12 @@ public class BreakableBody implements RayCastCallback {
                 for(int i = 0;i<countVertices;i++){
                     shape.getVertex(i, currentVertex);
                     vertices[i] = new Vector2(body.getWorldPoint(currentVertex));
+
+                    if(minParent == null)minParent = new Vector2(vertices[i]);else {
+                        minParent.x = Math.min(minParent.x, vertices[i].x);
+                        minParent.y = Math.min(minParent.y, vertices[i].y);
+                    }
+
                 }
 
                 centre = findCentroid(vertices);
@@ -269,40 +280,27 @@ public class BreakableBody implements RayCastCallback {
 
         body.setTransform(body.getPosition(), 0);
 
-        Box2DDebug.createCircle(mWorld, centre);
-
-        Array<Fixture> fixtures = body.getFixtureList();
         for(Fixture fixture : fixtures){
             PolygonShape shape = (PolygonShape)fixture.getShape();
+
             int countVertices = shape.getVertexCount();
             Vector2[] vertices = new Vector2[countVertices];
             Vector2 currentVertex = new Vector2();
             for(int i = 0;i<countVertices;i++){
                 shape.getVertex(i, currentVertex);
-                vertices[i] = new Vector2(currentVertex);
+                vertices[i] = new Vector2(body.getWorldPoint(currentVertex));
             }
 
-            createSlice(vertices, body, body.getWorldPoint(currentVertex));
+            createSlice(vertices, body, centre, minParent);
 
         }
 
         destroyBody(body);
     }
 
-    private void createSlice(PolygonShape shape,  Body fromBody, Vector2[] textureVertices){
-
-        BodyDef sliceBodyDef = new BodyDef();
-        sliceBodyDef.type = BodyDef.BodyType.StaticBody;
-        Body sliceBody = mWorld.createBody(sliceBodyDef);
-        sliceBody.createFixture(shape, 1);
 
 
-        shape.dispose();
-
-    }
-
-
-    private void createSlice(Vector2[] vertices, Body fromBody, Vector2 centre) {
+    private void createSlice(Vector2[] vertices, Body fromBody, Vector2 centre, Vector2 minParent) {
 
         if (getArea(vertices) > 0.01f) {
 
@@ -313,8 +311,16 @@ public class BreakableBody implements RayCastCallback {
                     net.dermetfan.gdx.math.GeometryUtils.minX(floatVertices),
                     net.dermetfan.gdx.math.GeometryUtils.minY(floatVertices)
                 );
+            Vector2 max = new Vector2(
+                    net.dermetfan.gdx.math.GeometryUtils.maxX(floatVertices),
+                    net.dermetfan.gdx.math.GeometryUtils.maxY(floatVertices)
+                );
 
-            Vector2 centerVertices = findCentroid(vertices);
+            Vector2 diff = new Vector2(1.5f, 1.5f);
+
+
+            Vector2 centerVertices = new Vector2(min.x + (max.x - min.x) / 2,
+                    min.y + (max.y - min.y) / 2);
 
             if(centre == null) centre = centerVertices;
 
@@ -324,20 +330,18 @@ public class BreakableBody implements RayCastCallback {
 
             PolygonShape slicePoly = new PolygonShape();
 
-
-
             Vector2[] textureVertices = new Vector2[vertices.length];
 
             int index = 0;
             for (Vector2 vertex : vertices) {
                 textureVertices[index++] = new Vector2(vertex.x, vertex.y);
-                vertex.sub(centerVertices);
+                vertex.sub(min);
             }
-
-            Box2DDebug.logVertices(vertices, "vertices");
 
             slicePoly.set(vertices);
             sliceBody.createFixture(slicePoly, 1);
+
+            Box2DDebug.createCross(mWorld, centre, 2f);
 
             if(properties.angleOnExplosion != 0){
                 sliceBody.setTransform(centre, properties.angleOnExplosion);
